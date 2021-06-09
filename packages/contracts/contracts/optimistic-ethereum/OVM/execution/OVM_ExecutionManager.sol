@@ -1090,8 +1090,13 @@ contract OVM_ExecutionManager is iOVM_ExecutionManager, Lib_AddressResolver {
         )
     {
         uint256 messageValue = _nextMessageContext.ovmCALLVALUE;
-        // If there is value in this message, we need to transfer the ETH over before switching contexts.
-        if (messageValue > 0) {
+
+        if (messageValue > ovmSELFBALANCE()) {
+            return (false, hex"");
+        }
+
+        // If there is value in this message, and this is not a delegate call, we need to transfer the ETH over before switching contexts.
+        if (messageValue > 0 && _nextMessageContext.ovmADDRESS != messageContext.ovmADDRESS) {
             // Handle out-of-intrinsic gas consistent with EVM behavior -- the subcall "appears to revert" if we don't have enough gas to transfer the ETH.
             // Similar to dynamic gas cost of value exceeding gas here:
             // https://github.com/ethereum/go-ethereum/blob/c503f98f6d5e80e079c1d8a3601d188af2a899da/core/vm/interpreter.go#L268-L273 
@@ -1162,7 +1167,7 @@ contract OVM_ExecutionManager is iOVM_ExecutionManager, Lib_AddressResolver {
         // If the message threw an exception, its value should be returned back to the sender.
         // So, we force it back, BEFORE returning the messageContext to the previous addresses.
         // This operation is part of the reason we "reserved the intrinsic gas" above.
-        if (messageValue > 0 && !success) {
+        if (messageValue > 0  && _nextMessageContext.ovmADDRESS != prevMessageContext.ovmADDRESS && !success) {
             bool transferredOvmEth = _attemptForcedEthTransfer(
                 prevMessageContext.ovmADDRESS,
                 messageValue
