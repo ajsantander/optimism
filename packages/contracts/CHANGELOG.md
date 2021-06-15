@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.6
+
+### Patch Changes
+
+- c87e4c74: Migrated from tslint to eslint. The preference for lint exceptions is as follows: line level, block level, file level, package level.
+
 ## 0.3.5
 
 ### Patch Changes
