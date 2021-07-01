@@ -7,7 +7,11 @@ import { MerkleTree } from 'merkletreejs'
 import { fromHexString, sleep } from '@eth-optimism/core-utils'
 import { Logger, BaseService, Metrics } from '@eth-optimism/common-ts'
 
-import { loadContract, loadContractFromManager } from '@eth-optimism/contracts'
+import {
+  loadContract,
+  loadContractFromManager,
+  predeploys,
+} from '@eth-optimism/contracts'
 import { StateRootBatchHeader, SentMessage, SentMessageProof } from './types'
 
 interface MessageRelayerOptions {
@@ -128,7 +132,7 @@ export class MessageRelayerService extends BaseService<MessageRelayerOptions> {
     this.logger.info('Connecting to OVM_L2ToL1MessagePasser...')
     this.state.OVM_L2ToL1MessagePasser = loadContract(
       'OVM_L2ToL1MessagePasser',
-      '0x4200000000000000000000000000000000000000',
+      predeploys.OVM_L2ToL1MessagePasser,
       this.options.l2RpcProvider
     )
     this.logger.info('Connected to OVM_L2ToL1MessagePasser', {
@@ -270,9 +274,7 @@ export class MessageRelayerService extends BaseService<MessageRelayerOptions> {
     }
   }
 
-  private async _getStateBatchHeader(
-    height: number
-  ): Promise<
+  private async _getStateBatchHeader(height: number): Promise<
     | {
         batch: StateRootBatchHeader
         stateRoots: string[]
@@ -304,11 +306,12 @@ export class MessageRelayerService extends BaseService<MessageRelayerOptions> {
         endBlock: startingBlock + this.options.getLogsInterval,
       })
 
-      const events: ethers.Event[] = await this.state.OVM_StateCommitmentChain.queryFilter(
-        this.state.OVM_StateCommitmentChain.filters.StateBatchAppended(),
-        startingBlock,
-        startingBlock + this.options.getLogsInterval
-      )
+      const events: ethers.Event[] =
+        await this.state.OVM_StateCommitmentChain.queryFilter(
+          this.state.OVM_StateCommitmentChain.filters.StateBatchAppended(),
+          startingBlock,
+          startingBlock + this.options.getLogsInterval
+        )
 
       this.state.eventCache = this.state.eventCache.concat(events)
       startingBlock += this.options.getLogsInterval
@@ -329,12 +332,11 @@ export class MessageRelayerService extends BaseService<MessageRelayerOptions> {
       event.transactionHash
     )
 
-    const [
-      stateRoots,
-    ] = this.state.OVM_StateCommitmentChain.interface.decodeFunctionData(
-      'appendStateBatch',
-      transaction.data
-    )
+    const [stateRoots] =
+      this.state.OVM_StateCommitmentChain.interface.decodeFunctionData(
+        'appendStateBatch',
+        transaction.data
+      )
 
     return {
       batch: {
@@ -386,10 +388,11 @@ export class MessageRelayerService extends BaseService<MessageRelayerOptions> {
 
     const messages = events.map((event) => {
       const message = event.args.message
-      const decoded = this.state.OVM_L2CrossDomainMessenger.interface.decodeFunctionData(
-        'relayMessage',
-        message
-      )
+      const decoded =
+        this.state.OVM_L2CrossDomainMessenger.interface.decodeFunctionData(
+          'relayMessage',
+          message
+        )
 
       return {
         target: decoded._target,
